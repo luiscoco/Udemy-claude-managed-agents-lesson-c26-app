@@ -42,28 +42,98 @@ CLAUDE_MANAGED_ENVIRONMENT_ID=your_environment_id
 PORT=3026
 ```
 
-## How the application was developed
+## How the app was build
 
-The browser collects inputs; the Node host validates requests; the lesson implementation produces observable evidence. The architecture page walks through the real source with numbered steps, prerequisite configuration, source filenames and code excerpts.
+### 1. Distinguish a host bridge from native MCP
 
-### Lesson implementation
+The bridge branch reports custom-tool telemetry. A host adapter speaking MCP is a different observation path from a native provider MCP call.
 
-[src/lesson.ts](https://github.com/luiscoco/Udemy-claude-managed-agents-lesson-c26-app/blob/main/src/lesson.ts)
+Source: [src/lesson.ts](src/lesson.ts#L13)
 
 ```typescript
-  async run(input) {
-
-if(text(input,"path")==="bridge")return report("passed","Host bridge telemetry is not native MCP evidence",{telemetry:"custom-tool",eventType:"agent.custom_tool_use"},["Host receives a custom request","Local adapter speaks MCP","Return a user.custom_tool_result"]);
-if(!flag(input,"reachable"))return report("rejected","Cloud reachability has not been established",{stage:"reachability"},["Distinguish laptop reachability from cloud access"]);
-if(!flag(input,"authenticated"))return report("rejected","The endpoint was reachable but authentication failed",{stage:"authentication"},["Check authentication independently from networking"]);
-const matched=text(input,"resultCallId")==="mcp-call-1";
-return report(matched?"passed":"rejected","Correlate the result with the captured native call",{matched,telemetry:"native-mcp",callId:"mcp-call-1",resultCallId:text(input,"resultCallId")},["Observe native MCP tool use","Match mcp_tool_use_id","Inspect the result separately from connection setup"]);
-
-  }
-};
+if (text(input, "path") === "bridge")
+  return report(
+    "passed",
+    "Host bridge telemetry is not native MCP evidence",
+    { telemetry: "custom-tool", eventType: "agent.custom_tool_use" },
+    [
+      "Host receives a custom request",
+      "Local adapter speaks MCP",
+      "Return a user.custom_tool_result",
+    ],
+  );
 ```
 
-Read the architecture page for the remaining source excerpts and explanations, including input handling and optional provider behavior. The diagram describes this application, rather than implying that an external integration has been implemented.
+### 2. Check reachability and authentication independently
+
+A reachable endpoint can still reject authentication. These supplied flags model separate failure stages; the sample does not connect to an MCP endpoint.
+
+Source: [src/lesson.ts](src/lesson.ts#L14) · selected statements
+
+```typescript
+if (!flag(input, "reachable"))
+  return report(
+    "rejected",
+    "Cloud reachability has not been established",
+    { stage: "reachability" },
+    ["Distinguish laptop reachability from cloud access"],
+  );
+
+if (!flag(input, "authenticated"))
+  return report(
+    "rejected",
+    "The endpoint was reachable but authentication failed",
+    { stage: "authentication" },
+    ["Check authentication independently from networking"],
+  );
+```
+
+### 3. Correlate the captured native call ID
+
+The result-call identifier must match the seeded call. The evidence shows both IDs and the chosen telemetry path so connection configuration cannot be mistaken for a successful tool result.
+
+Source: [src/lesson.ts](src/lesson.ts#L16) · selected statements
+
+```typescript
+const matched = text(input, "resultCallId") === "mcp-call-1";
+
+return report(
+  matched ? "passed" : "rejected",
+  "Correlate the result with the captured native call",
+  {
+    matched,
+    telemetry: "native-mcp",
+    callId: "mcp-call-1",
+    resultCallId: text(input, "resultCallId"),
+  },
+  [
+    "Observe native MCP tool use",
+    "Match mcp_tool_use_id",
+    "Inspect the result separately from connection setup",
+  ],
+);
+```
+
+### Check your understanding
+
+Run **Correlate a native result** in the application. Compare the result with these scenario expectations:
+
+```json
+{
+  "input": {
+    "path": "native",
+    "reachable": true,
+    "authenticated": true,
+    "resultCallId": "mcp-call-1"
+  },
+  "expectedOutcome": "passed",
+  "checkEvidence": {
+    "matched": true
+  }
+}
+```
+
+Then try **Diagnose an unreachable endpoint**. Its expected outcome is `rejected`; identify the condition or evidence field that explains the difference.
 
 ## Validation
 
