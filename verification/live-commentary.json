@@ -1,0 +1,29 @@
+{
+  "source": "live-provider-commentary",
+  "sessionId": "sesn_01FsEQoTxTB1YL8fuxm13arw",
+  "answer": "This is a local experiment designed to teach how to correlate an MCP tool call with its result by matching a shared identifier (`mcp-call-1` appears in both `callId` and `resultCallId`). The lesson demonstrates that a tool invocation and its returned result are separate, linkable events \u2014 not a single atomic operation. The experiment ran locally and its \"passed\" outcome reflects only that the ID-matching logic worked in that controlled context, not that any real remote MCP connection or permission was established.",
+  "stopReason": "end_turn",
+  "eventTypes": [
+    "session.status_running",
+    "session.thread_status_running",
+    "user.message",
+    "span.model_request_start",
+    "agent.thinking",
+    "agent.message",
+    "span.model_request_end",
+    "session.thread_status_idle",
+    "session.usage",
+    "session.status_idle"
+  ],
+  "requestUsage": [
+    {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 604,
+      "output_tokens": 143,
+      "speed": "standard"
+    }
+  ],
+  "experimentHash": "617de21d62cb2da6b9003cb7f77304ac67f623a494e75f456ec99909c9610a58",
+  "scope": "A real text-only model response about the local experiment. External integrations and the experiment's correctness are not certified by this response."
+}

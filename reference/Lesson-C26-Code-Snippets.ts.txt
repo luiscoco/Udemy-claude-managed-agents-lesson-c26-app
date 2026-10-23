@@ -1,0 +1,54 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+import type { BetaManagedAgentsSessionEvent as Event } from "@anthropic-ai/sdk/resources/beta/sessions/events";
+export function inventoryAgentParams(modelId: string) {
+  return { name: "Inventory Reader", model: modelId,
+    mcp_servers: [{ type: "url" as const, name: "inventory", url: "https://inventory.example.com/mcp" }],
+    tools: [{ type: "mcp_toolset" as const, mcp_server_name: "inventory",
+      default_config: { enabled: false, permission_policy: { type: "always_ask" as const } },
+      configs: [{ name: "get_stock", enabled: true }] }], skills: [], multiagent: null };
+}
+export async function createInventoryAgent(client: Anthropic, modelId: string) {
+  // Placeholder endpoint; replace with your reviewed reachable HTTPS MCP service.
+  return client.beta.agents.create(inventoryAgentParams(modelId), { maxRetries: 0, timeout: 10000 });
+}
+export function inventorySessionParams(agentId: string, version: number, environmentId: string, authorizedVaultId: string) {
+  if (!authorizedVaultId.trim()) throw new Error("Authorized vault ID required");
+  return { agent: { type: "agent" as const, id: agentId, version },
+    environment_id: environmentId, vault_ids: [authorizedVaultId] };
+}
+export async function createInventorySession(client: Anthropic, agentId: string, version: number,
+  environmentId: string, authorizedVaultId: string) {
+  return client.beta.sessions.create(inventorySessionParams(agentId, version, environmentId, authorizedVaultId),
+    { maxRetries: 0, timeout: 10000 });
+}
+export function diagnoseMcp(event: Event) {
+  if (event.type !== "session.error") return null;
+  const e = event.error;
+  if (e.type !== "mcp_connection_failed_error" && e.type !== "mcp_authentication_failed_error") return null;
+  return { eventId: event.id, kind: e.type, server: e.mcp_server_name, retry: e.retry_status.type };
+}
+export function makeNativeEvidence() {
+  const calls = new Map<string, { name: string; server: string }>();
+  return { ingest(event: Event) {
+    if (event.type === "agent.mcp_tool_use") calls.set(event.id, { name: event.name, server: event.mcp_server_name });
+    if (event.type !== "agent.mcp_tool_result") return null;
+    const call = calls.get(event.mcp_tool_use_id);
+    return { callId: event.mcp_tool_use_id, resultId: event.id, matched: !!call, call,
+      outcome: event.is_error === true ? "error" : event.is_error === false ? "non-error-result" : "unspecified" };
+  } };
+}
+const StockInput = z.strictObject({ sku: z.string().regex(/^SKU-[0-9]{4}$/) });
+type LocalClient = { callTool: (request: { name: string; arguments: { sku: string } }, options: { signal: AbortSignal }) => Promise<unknown> };
+export async function bridgeStock(name: string, input: unknown, context: { authorized: boolean; signal: AbortSignal }, mcp: LocalClient) {
+  if (!context.authorized || name !== "get_stock") throw new Error("Bridge call not authorized or enabled");
+  const args = StockInput.parse(input);
+  context.signal.throwIfAborted();
+  return mcp.callTool({ name: "get_stock", arguments: args }, { signal: context.signal });
+}
+// The host bridge exposes a CUSTOM tool and returns user.custom_tool_result for its sevt_ ID.
+// It is not native agent.mcp_tool_use telemetry. The local MCP adapter owns transport/stdio lifecycle.
+// Host auth, bounded deadlines, tenant scoping and durable result delivery remain required.
+// Native URL path: limited networking must admit the hostname or enable allow_mcp_servers.
+// That policy check does not establish DNS reachability, authentication or tool success.
+// Native ask calls need user.tool_confirmation; creation alone proves neither connection nor credentials.

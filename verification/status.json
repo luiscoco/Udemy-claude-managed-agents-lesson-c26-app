@@ -1,0 +1,13 @@
+{
+  "lesson": "C26",
+  "title": "MCP Connections and Reachability",
+  "path": "lesson-c26\\lesson-c26-app",
+  "port": 3026,
+  "scenarios": 3,
+  "state": "implemented and verified",
+  "liveScope": "text-only commentary about the local result",
+  "typecheck": true,
+  "localTests": true,
+  "browserSmoke": "passed: desktop, mobile, scenario controls, source view",
+  "liveCommentarySmoke": "passed: real text-only session reached end_turn"
+}
